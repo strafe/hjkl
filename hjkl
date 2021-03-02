@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+
+# hjkl
+# 💃 DDR, but with Vi keys.
+readonly program="$(basename "$0")"
+readonly version=0.0.1
+
+# Red, Green, Default, Cyan, Blue, Yellow & Magenta.
+readonly colors=('\e[31m' '\e[32m' '\e[39m' '\e[36m' '\e[34m' '\e[33m' '\e[35m')
+readonly symbols=(⬅ ⬇ ⬆ ⮕ )
+
+# Misc.
+current_level=0
+current_lives=3
+count_correct=0
+count_incorrect=0
+keys_per_level=9
+
+function hjkl_args() {
+    while [ -n "$1" ]; do
+        case "$1" in
+            -h|--help) hjkl_usage; exit ;;
+            -v|--version) printf '%s: version %s\n' "$program" "$version"; exit ;;
+            -k|--keys) keys_per_level="$2"; shift ;;
+            -l|--lives) current_lives="$2"; shift ;;
+            -*) printf '%s: Invalid option: %s\n' "$program" "$1" 1>&2; exit 1 ;;
+        esac
+        shift
+    done
+
+    (( "$current_lives" <= 0 )) && current_lives=-1
+}
+
+function hjkl_usage() {
+    cat <<EOF
+Usage: $program [OPTIONS]
+DDR, but with Vi keys.
+
+Options:
+        -h, --help      Output a help message.
+        -v, --version   Output the current version.
+        -k, --keys      Amount of keys per level (minimum of 1).
+        -l, --lives     Amount of lives before game over (0 for infinite).
+EOF
+}
+
+function hjkl_random() {
+    inputs=()
+    directions=()
+    for i in $(seq 1 "$keys_per_level"); do
+        directions+=($(shuf -i 0-3 -n 1))
+    done
+}
+
+function hjkl_update() {
+    read -n 1 input
+    [[ "$input" == q ]] && hjkl_endgame 0
+
+    case "$input" in
+        h) input=0 ;;
+        j) input=1 ;;
+        k) input=2 ;;
+        l) input=3 ;;
+    esac
+
+    if [[ "$input" == "${directions[${#inputs[@]}]}" ]]; then
+        (( ++count_correct ))
+        inputs+=(1)
+    else
+        (( ++count_incorrect ))
+        inputs+=(0)
+
+        # Out of lives?
+        (( "$current_lives" != -1  )) && (( --current_lives ))
+        (( "$current_lives" == 0 )) && hjkl_endgame 1
+    fi
+}
+
+function hjkl_print() {
+    tput clear
+
+    # Statistics.
+    printf "${colors[4]}▶ ${colors[2]}Level %d · ${colors[5]}♥ ${colors[2]}%s Lives\n" \
+        "$current_level" \
+        "$((( "$current_lives" == -1 )) && echo ∞ || echo "$current_lives")"
+
+    printf "${colors[1]}✔ ${colors[2]}%d Correct · ${colors[0]}✖ ${colors[2]}%d Incorrect\n" \
+        "$count_correct" \
+        "$count_incorrect"
+
+    printf "${colors[6]}≈ ${colors[2]}%.3f Seconds\n\n" \
+        "$(bc -l <<< "(${SECONDS}/(${count_correct}+${count_incorrect}))" 2> /dev/null)"
+
+    # Arrows.
+    for i in "${!directions[@]}"; do
+        printf "${colors[2]}%b%b%s  " \
+            "$((( "$i" == "${#inputs[@]}" )) && echo "${colors[3]}")" \
+            "$([ ! -z "${inputs[$i]}" ] && echo "${colors[${inputs[$i]}]}")" \
+            "${symbols[${directions[$i]}]}"
+    done
+
+    # Prompt.
+    printf "\n\n${colors[2]}? "
+}
+
+function hjkl_endgame() {
+    tput clear
+    if [[ "$1" == 1 ]]; then
+        printf "${colors[0]}(｡•́︿•̀｡) ${colors[2]}Game over... (%s)\n" \
+            "$(hjkl_humantime "$SECONDS")"
+    else
+        printf "${colors[1]}(´･ᴗ･\`) ${colors[2]}Game finished! (%s)\n" \
+            "$(hjkl_humantime "$SECONDS")"
+    fi
+
+    printf "  - You made it to level ${colors[4]}%d${colors[2]}.\n  - You had ${colors[5]}%s ${colors[2]}lives left.\n  - You pressed the correct key ${colors[1]}%d ${colors[2]}times.\n  - You pressed the incorrect key ${colors[0]}%d ${colors[2]}times.\n  - You had an average response time of ${colors[6]}%.3f ${colors[2]}seconds.\n" \
+        "$current_level" \
+        "$((( "$current_lives" == -1 )) && echo ∞ || echo "$current_lives")" \
+        "$count_correct" "$count_incorrect" "$(bc -l <<< "(${SECONDS}/(${count_correct}+${count_incorrect}))" 2> /dev/null)"
+
+    exit
+}
+
+function hjkl_humantime() {
+    local humantime
+    local days="$(( $1 / 60 / 60 / 24 ))"
+    local hours="$(( $1 / 60 / 60 % 24 ))"
+    local minutes="$(( $1 / 60 % 60 ))"
+    local seconds="$(( $1 % 60 ))"
+
+    (( days > 0 )) && humantime+="${days}d "
+    (( hours > 0 )) && humantime+="${hours}h "
+    (( minutes > 0 )) && humantime+="${minutes}m "
+    humantime+="${seconds}s"
+
+    echo "$humantime"
+}
+
+hjkl_args "$@"
+while :; do
+    (( ++current_level ))
+    hjkl_random
+
+    for i in "${directions[@]}"; do
+        hjkl_print
+        hjkl_update
+    done
+done
