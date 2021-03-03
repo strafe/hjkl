@@ -3,7 +3,7 @@
 # hjkl
 # 💃 DDR, but with Vi keys.
 readonly program="$(basename "$0")"
-readonly version=0.0.1
+readonly version=0.0.2
 
 # Red, Green, Default, Cyan, Blue, Yellow & Magenta.
 readonly colors=('\e[31m' '\e[32m' '\e[39m' '\e[36m' '\e[34m' '\e[33m' '\e[35m')
@@ -46,10 +46,7 @@ EOF
 
 function hjkl_random() {
     inputs=()
-    directions=()
-    for i in $(seq 1 "$keys_per_level"); do
-        directions+=($(shuf -i 0-3 -n 1))
-    done
+    directions=($(shuf -i 0-3 -n "$keys_per_level" -r))
 }
 
 function hjkl_update() {
