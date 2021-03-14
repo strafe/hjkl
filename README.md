@@ -21,6 +21,8 @@ Options:
         -k, --keys      Amount of keys per level (minimum of 1).
         -l, --lives     Amount of lives before game over (0 for infinite).
 ```
+
+## Preview
 <center><img src=".github/assets/preview.gif"></center>
 
 ## License
